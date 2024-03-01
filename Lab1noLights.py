@@ -1,54 +1,56 @@
 import numpy as np
-import scipy.signal as signal
 import scipy.fftpack as fftpack
 import pyaudio
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 # Parámetros de la grabación
 CHUNK_SIZE = 1024  # Tamaño del chunk de audio para procesar
 FORMAT = pyaudio.paInt16  # Formato de audio
-RATE = 44100  # Tasa de muestreo (puede ajustarse según sea necesario)
-THRESHOLD = 10000  # Umbral para la detección de ruido blanco (ajusta según sea necesario)
+RATE = 44100  # Tasa de muestreo
+THRESHOLD = 10000  # Umbral para detección de ruido blanco
 
 # Inicializa PyAudio
 audio = pyaudio.PyAudio()
 
-# Abre el dispositivo de entrada de audio (micrófono)
+# Abre el dispositivo de entrada de audio (micrófono), parametro input_device_index=2 para micro pc o igual a 7 para externo de droidcam
 stream = audio.open(format=FORMAT, channels=1, rate=RATE, input=True,
                     frames_per_buffer=CHUNK_SIZE)
 
-print("Analizando audio en tiempo real...")
+fig, ax = plt.subplots()
+x = np.arange(-CHUNK_SIZE + 1, CHUNK_SIZE, 1)
+line, = ax.plot(x, np.zeros_like(x))
+ax.set_ylim(0, 60000)  # Ajusta este valor según sea necesario
 
-try:
-    while True:
-        
-        
-        # Lee un chunk de audio desde el micrófono
-        audio_data = np.frombuffer(stream.read(CHUNK_SIZE), dtype=np.int16)
+def init():
+    line.set_ydata(np.zeros_like(x))
+    return line,
 
-        # Calcula la autocovarianza de la señal de audio
-        autocovariance = np.correlate(audio_data, audio_data, mode='full')
+def is_white_noise(fft_norm, threshold=THRESHOLD):
+    # Considera ruido blanco si todas las frecuencias tienen una norma por debajo del umbral
+    return np.all(fft_norm < threshold)
 
-        # Aplica la Transformada Rápida de Fourier (FFT)
-        fft_result = fftpack.fft(autocovariance)
+def update(frame):
+    audio_data = np.frombuffer(stream.read(CHUNK_SIZE, exception_on_overflow=False), dtype=np.int16)
+    autocovariance = np.correlate(audio_data, audio_data, mode='full')
+    
 
-        # Calcula la norma en cada punto de la FFT
-        fft_norm = np.abs(fft_result)
+    # FFT y norma para detección de ruido blanco
+    fft_result = fftpack.fft(autocovariance)
+    fft_norm = np.abs(fft_result)
+    line.set_ydata(fft_norm)
+    if is_white_noise(fft_norm):
+        print("Ruido blanco detectado")
+    else:
+        print("Señal de audio detectada")
+    
+    return line,
 
-        # Comprueba si la señal es ruido blanco
-        is_white_noise = np.all(fft_norm < THRESHOLD)
+ani = FuncAnimation(fig, update, init_func=init, blit=True, repeat=False, frames=None)
 
-        if is_white_noise:
-            print("Ruido blanco detectado")
-        else:
-            print("Señal de audio detectada")
-            
-except KeyboardInterrupt:
-    pass
+plt.show()
 
-print("Deteniendo la captura de audio...")
-
-# Cierra el flujo de audio y termina PyAudio
+# Detiene y cierra el flujo de audio
 stream.stop_stream()
 stream.close()
 audio.terminate()
