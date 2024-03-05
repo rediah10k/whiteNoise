@@ -9,10 +9,10 @@ p = pyaudio.PyAudio()
 
 # Definición de constantes
 FORMAT = pyaudio.paFloat32
-CHANNELS = 2
-RATE = 44100*2
-CHUNK = 1024*9
-LIVE_PLOT_UPDATE = 0.05  # Intervalo de actualización del gráfico en segundos
+CHANNELS = 1
+RATE = 44100
+CHUNK = 1024
+LIVE_PLOT_UPDATE = 0.1  # Intervalo de actualización del gráfico en segundos
 
 # Función para calcular la autocorrelación
 def autocorrelation(x):
@@ -32,9 +32,9 @@ def spectrum(x):
     return np.abs(fft(x))
 
 # Función para determinar si una señal es ruido blanco
-def is_white_noise(spectrum, threshold=0.0015):
+def is_white_noise(spectrum, threshold):
     # Debes definir cómo determinar el umbral
-    return np.std(spectrum)  < threshold
+    return np.std(spectrum) < threshold
 
 # Crear un gráfico en tiempo real
 plt.ion()
@@ -56,8 +56,8 @@ def process_and_plot(stream,ax):
     # Calculando la FFT y el espectro
     spctrm = spectrum(autocovar)
 
-    
-    white_noise = is_white_noise(spctrm)
+    threshold = 1e-4
+    white_noise = is_white_noise(spctrm,threshold)
 
     # Actualizando gráficos
     ax1.clear()
